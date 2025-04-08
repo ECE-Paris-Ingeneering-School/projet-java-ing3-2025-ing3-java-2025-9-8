@@ -5,10 +5,9 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DatabaseConnection {
-    private static final String URL = "jdbc:mysql://localhost:3306/PuppyYogaDB";
+    private static final String URL = "jdbc:mysql://localhost:3306/puppyyogadb";
     private static final String USER = "root";
-    private static final String PASSWORD = ""; // pas de mdp pour WAMP
-    private static Connection connection = null;
+    private static final String PASSWORD = "";
 
     public static Connection getConnection() throws SQLException {
         try {
@@ -16,9 +15,7 @@ public class DatabaseConnection {
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
-        if(connection == null || connection.isClosed()){
-            connection = DriverManager.getConnection(URL, USER, PASSWORD);
-        }
-        return connection;
+        // Crée toujours une nouvelle connexion
+        return DriverManager.getConnection(URL, USER, PASSWORD);
     }
 }
