@@ -88,19 +88,19 @@ public class EventCard extends JPanel {
     private ImageIcon getDogIcon(String breedName){
         String path=null;
         if(breedName.equalsIgnoreCase("Golden Retriever")){
-            path="golden.png";
+            path="photos/golden.png";
         } else if(breedName.equalsIgnoreCase("Labrador")){
-            path="labrador.png";
+            path="photos/labrador.png";
         } else if(breedName.equalsIgnoreCase("Beagle")){
-            path="beagle.png";
+            path="photos/beagle.png";
         } else if(breedName.equalsIgnoreCase("Bulldog")){
-            path="bulldog.png";
+            path="photos/bulldog.png";
         } else if(breedName.equalsIgnoreCase("Cocker Spaniel")){
-            path="cocker.png";
+            path="photos/cocker.png";
         } else if(breedName.equalsIgnoreCase("Poodle")){
-            path="poodle.png";
+            path="photos/poodle.png";
         } else if(breedName.equalsIgnoreCase("Schnauzer")){
-            path="schnauzer.png";
+            path="photos/schnauzer.png";
         }
         if(path!=null){
             ImageIcon icon=new ImageIcon(path);
