@@ -17,3 +17,4 @@ public class OrderInfoSimple {
     public Timestamp getOrderDate() { return orderDate; }
     public double getTotal() { return total; }
 }
+

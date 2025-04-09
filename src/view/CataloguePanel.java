@@ -13,6 +13,7 @@ public class CataloguePanel extends JPanel {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
+
         JLabel title = new JLabel("Catalogue", SwingConstants.CENTER);
         title.setFont(new Font("Serif", Font.BOLD, 32));
         add(title, BorderLayout.NORTH);
