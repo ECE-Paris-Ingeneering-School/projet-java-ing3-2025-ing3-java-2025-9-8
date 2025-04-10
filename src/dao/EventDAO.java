@@ -7,6 +7,10 @@ import java.util.List;
 
 public class EventDAO {
 
+    /**
+     * Retourne la liste des événements (sessions) filtrés.
+     * Pour chaque session, le nombre de places restantes est calculé comme : capacity - sold.
+     */
     public static List<Event> getEventsFiltered(String niveauFilter,
                                                 String dateFilter,
                                                 String lieuFilter,
@@ -14,23 +18,20 @@ public class EventDAO {
                                                 String breedFilter) {
         List<Event> events = new ArrayList<>();
 
-        String sql = "SELECT s.id AS sessionId, "
-                + "       s.session_date, s.session_time, s.level, s.capacity, "
-                + "       l.name AS locationName, "
-                + "       CONCAT(t.first_name, ' ', t.last_name) AS teacherName, "
-                + "       d.breed_name AS breedName, "
-                + "       (SELECT IFNULL(SUM(od.quantity),0) "
-                + "        FROM OrderDetails od "
-                + "        JOIN OrderInfo o ON o.id = od.order_id "
-                + "        WHERE od.product_id = s.id) AS sold "
-                + "FROM `Session` s "
-                + "JOIN Location l ON s.location_id = l.id "
-                + "JOIN Teacher t ON s.teacher_id = t.id "
-                + "JOIN DogBreed d ON s.dog_breed_id = d.id";
+        String sql = "SELECT s.id AS sessionId, s.session_date, s.session_time, s.level, s.capacity, " +
+                "l.name AS locationName, " +
+                "CONCAT(t.first_name, ' ', t.last_name) AS teacherName, " +
+                "d.breed_name AS breedName, " +
+                "(SELECT IFNULL(SUM(od.quantity), 0) " +
+                " FROM OrderDetails od JOIN OrderInfo o ON od.order_id = o.id " +
+                " WHERE od.product_id = s.id) AS sold " +
+                "FROM Session s " +
+                "JOIN Location l ON s.location_id = l.id " +
+                "JOIN Teacher t ON s.teacher_id = t.id " +
+                "JOIN DogBreed d ON s.dog_breed_id = d.id";
 
         boolean addWhere = false;
-        if (!niveauFilter.equalsIgnoreCase("Tous")
-                || !dateFilter.isEmpty()
+        if (!niveauFilter.equalsIgnoreCase("Tous") || !dateFilter.isEmpty()
                 || !lieuFilter.equalsIgnoreCase("Tous")
                 || !teacherFilter.equalsIgnoreCase("Tous")
                 || !breedFilter.equalsIgnoreCase("Tous")) {
@@ -63,7 +64,7 @@ public class EventDAO {
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            int index=1;
+            int index = 1;
             if (!niveauFilter.equalsIgnoreCase("Tous")) {
                 stmt.setString(index++, niveauFilter);
             }
@@ -92,7 +93,11 @@ public class EventDAO {
                 String breedName = rs.getString("breedName");
                 int sold = rs.getInt("sold");
 
+                // Calculer les places restantes
                 int placesRestantes = capacity - sold;
+                System.out.println("Session " + sessionId + " : capacity = " + capacity
+                        + ", sold = " + sold + ", places restantes = " + placesRestantes);
+
                 String title = "Session " + sessionId + " à " + locationName;
                 String dateStr = sessionDate.toString() + " " + sessionTime.toString();
 

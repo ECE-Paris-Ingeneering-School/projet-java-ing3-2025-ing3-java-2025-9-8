@@ -79,7 +79,20 @@ public class MainFrame extends JFrame {
         cartLabel.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent e) {
-                new CartFrame(currentUser).setVisible(true);
+                new CartFrame(currentUser,
+                        () -> {
+                            // Callback déclenché après achat
+                            cardLayout.show(contentPanel, "PROFILE");
+                            contentPanel.remove(4); // Supprimer l'ancien ProfilePanel
+                            contentPanel.add(new ProfilePanel(currentUser), "PROFILE"); // Recharger avec les nouvelles données
+                        },
+                        () -> {
+                            // Callback déclenché après mise à jour de l'utilisateur (paiement ou livraison)
+                            cardLayout.show(contentPanel, "PROFILE");
+                            contentPanel.remove(4);
+                            contentPanel.add(new ProfilePanel(currentUser), "PROFILE");
+                        }
+                ).setVisible(true);
             }
         });
         header.add(cartLabel, BorderLayout.EAST);

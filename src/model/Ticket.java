@@ -8,6 +8,8 @@ public class Ticket {
     private double price;
     private int quantity;
     private int userId;
+
+
     private Timestamp addedDate;
 
     public Ticket(int id, int sessionId, double price,

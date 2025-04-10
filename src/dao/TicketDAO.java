@@ -7,7 +7,6 @@ import java.util.List;
 
 public class TicketDAO {
 
-    // Méthode pour insérer un ticket dans le panier
     public static boolean insertTicket(int sessionId, double price, int quantity, int userId) {
         String sql = "INSERT INTO Ticket (session_id, price, quantity, user_id) VALUES (?, ?, ?, ?)";
         try (Connection conn = DatabaseConnection.getConnection();
@@ -24,7 +23,6 @@ public class TicketDAO {
         }
     }
 
-    // Méthode pour récupérer les items du panier
     public static List<Ticket> getCartItems(int userId) {
         List<Ticket> items = new ArrayList<>();
         String sql = "SELECT * FROM Ticket WHERE user_id = ?";
@@ -48,7 +46,33 @@ public class TicketDAO {
         return items;
     }
 
-    // Méthode pour supprimer un item du panier
+    public static List<Ticket> getLastPurchasedItems(int userId) {
+        List<Ticket> items = new ArrayList<>();
+        String sql = "SELECT od.product_id AS session_id, od.price, od.quantity, oi.order_date FROM OrderDetails od " +
+                "JOIN OrderInfo oi ON od.order_id = oi.id " +
+                "WHERE oi.user_id = ? ORDER BY oi.order_date DESC LIMIT 10";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                int sessionId = rs.getInt("session_id");
+                double price = rs.getDouble("price");
+                int quantity = rs.getInt("quantity");
+                Timestamp addedDate = rs.getTimestamp("order_date");
+                Ticket t = new Ticket(0, sessionId, price, quantity, userId, addedDate);
+                items.add(t);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return items;
+    }
+
+    public static List<Ticket> getLastCartItems(int userId) {
+        return getLastPurchasedItems(userId);
+    }
+
     public static boolean removeItemFromCart(int ticketId) {
         String sql = "DELETE FROM Ticket WHERE id = ?";
         try (Connection conn = DatabaseConnection.getConnection();
@@ -62,7 +86,6 @@ public class TicketDAO {
         }
     }
 
-    // Méthode checkoutCart révisée
     public static boolean checkoutCart(int userId) {
         Connection conn = null;
         PreparedStatement orderStmt = null;
@@ -71,16 +94,13 @@ public class TicketDAO {
         PreparedStatement deleteStmt = null;
         try {
             conn = DatabaseConnection.getConnection();
-            conn.setAutoCommit(false); // Démarrage de la transaction
+            conn.setAutoCommit(false);
 
-            // 1. Récupérer les tickets du panier
             List<Ticket> tickets = getCartItems(userId);
             if (tickets.isEmpty()) {
-                System.out.println("Panier vide pour userId = " + userId);
                 return false;
             }
 
-            // 2. Calculer le total avec les remises
             double total = 0.0;
             int totalSessionQty = 0;
             double totalSessionPrice = 0.0;
@@ -119,13 +139,11 @@ public class TicketDAO {
                 }
             }
 
-            // Remise de 20 % sur les billets de séance si le total de billets est ≥ 4
             if (totalSessionQty >= 4) {
                 totalSessionPrice *= 0.8;
             }
             total += totalSessionPrice;
 
-            // Remise additionnelle de 20 % si achat simultané d'une brassière et d'un ensemble
             if (hasBrassiere && hasEnsemble) {
                 double sumBE = 0.0;
                 for (Ticket t : tickets) {
@@ -138,7 +156,6 @@ public class TicketDAO {
                 total -= discount;
             }
 
-            // 3. Insertion dans OrderInfo (facture)
             String insertOrderSql = "INSERT INTO OrderInfo (user_id, order_date, total) VALUES (?, NOW(), ?)";
             orderStmt = conn.prepareStatement(insertOrderSql, Statement.RETURN_GENERATED_KEYS);
             orderStmt.setInt(1, userId);
@@ -157,23 +174,21 @@ public class TicketDAO {
                 return false;
             }
 
-            // 4. Insertion dans OrderDetails pour chaque ticket
             String insertOrderDetailsSql = "INSERT INTO OrderDetails (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)";
             orderDetailsStmt = conn.prepareStatement(insertOrderDetailsSql);
             for (Ticket t : tickets) {
                 orderDetailsStmt.setInt(1, orderId);
-                orderDetailsStmt.setInt(2, t.getSessionId()); // Utilise session_id comme identifiant produit
+                orderDetailsStmt.setInt(2, t.getSessionId());
                 orderDetailsStmt.setInt(3, t.getQuantity());
                 orderDetailsStmt.setDouble(4, t.getPrice());
                 orderDetailsStmt.addBatch();
             }
             orderDetailsStmt.executeBatch();
 
-            // 5. Pour les tickets correspondant à des séances, insérer une réservation
             String insertReservationSql = "INSERT INTO Reservation (user_id, session_id, reservation_date) VALUES (?, ?, NOW())";
             reservationStmt = conn.prepareStatement(insertReservationSql);
             for (Ticket t : tickets) {
-                if (t.getSessionId() <= 100) { // Considérer session_id ≤ 100 comme séance
+                if (t.getSessionId() <= 100) {
                     reservationStmt.setInt(1, userId);
                     reservationStmt.setInt(2, t.getSessionId());
                     reservationStmt.addBatch();
@@ -181,7 +196,6 @@ public class TicketDAO {
             }
             reservationStmt.executeBatch();
 
-            // 6. Vider le panier
             String deleteSql = "DELETE FROM Ticket WHERE user_id = ?";
             deleteStmt = conn.prepareStatement(deleteSql);
             deleteStmt.setInt(1, userId);
