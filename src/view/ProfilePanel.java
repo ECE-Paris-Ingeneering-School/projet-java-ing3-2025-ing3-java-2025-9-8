@@ -33,14 +33,18 @@ public class ProfilePanel extends JPanel {
         JButton achatsBtn = new JButton("Mes achats");
         JButton infosBtn = new JButton("Données personnelles");
         JButton paiementBtn = new JButton("Moyens de paiement");
+        JButton logoutBtn = new JButton("Se déconnecter"); // 👈 Bouton déconnexion
 
         achatsBtn.setFocusPainted(false);
         infosBtn.setFocusPainted(false);
         paiementBtn.setFocusPainted(false);
+        logoutBtn.setFocusPainted(false);
 
         menuPanel.add(achatsBtn);
         menuPanel.add(infosBtn);
         menuPanel.add(paiementBtn);
+        menuPanel.add(logoutBtn); // 👈 Ajouté ici
+
         add(menuPanel, BorderLayout.CENTER);
 
         contentPanel = new JPanel();
@@ -62,6 +66,13 @@ public class ProfilePanel extends JPanel {
         paiementBtn.addActionListener(e -> {
             refreshPaiementPanel();
             cardLayout.show(contentPanel, "PAIEMENT");
+        });
+
+        // 👇 Action sur le bouton Se déconnecter
+        logoutBtn.addActionListener(e -> {
+            JFrame topFrame = (JFrame) SwingUtilities.getWindowAncestor(this);
+            topFrame.dispose(); // Ferme la fenêtre principale
+            new WelcomeFrame(); // Ouvre la page de connexion
         });
 
         cardLayout.show(contentPanel, "ACHATS");
@@ -182,11 +193,9 @@ public class ProfilePanel extends JPanel {
 
     public void refreshPanels() {
         contentPanel.removeAll();
-
         contentPanel.add(createAchatsPanel(), "ACHATS");
         contentPanel.add(createInfosPanel(), "INFOS");
         contentPanel.add(createPaiementPanel(), "PAIEMENT");
-
         contentPanel.revalidate();
         contentPanel.repaint();
     }

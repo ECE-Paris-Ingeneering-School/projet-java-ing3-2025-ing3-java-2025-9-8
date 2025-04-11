@@ -44,14 +44,21 @@ public class OrderSummaryPanel extends JPanel {
 
             JLabel imageLabel = new JLabel();
             imageLabel.setPreferredSize(new Dimension(100, 100));
-            ImageIcon icon = new ImageIcon(getImagePath(t.getSessionId()));
-            Image scaled = icon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
-            imageLabel.setIcon(new ImageIcon(scaled));
-            itemPanel.add(imageLabel, BorderLayout.WEST);
 
             String name = getItemName(t.getSessionId());
             int qty = t.getQuantity();
             double lineTotal = t.getPrice() * qty;
+
+            if (name.startsWith("Séance #") && t.getRace() != null) {
+                ImageIcon icon = getDogIcon(t.getRace());
+                if (icon != null) imageLabel.setIcon(icon);
+            } else {
+                ImageIcon icon = new ImageIcon(getImagePath(t.getSessionId()));
+                Image scaled = icon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
+                imageLabel.setIcon(new ImageIcon(scaled));
+            }
+
+            itemPanel.add(imageLabel, BorderLayout.WEST);
 
             JLabel nameLabel = new JLabel(name + " - Qté : " + qty);
             nameLabel.setFont(new Font("SansSerif", Font.PLAIN, 16));
@@ -63,7 +70,6 @@ public class OrderSummaryPanel extends JPanel {
 
             contentPanel.add(itemPanel);
 
-            // Calculs réductions
             if (name.startsWith("Séance #")) {
                 totalSessionQty += qty;
                 totalSessionPrice += lineTotal;
@@ -77,14 +83,10 @@ public class OrderSummaryPanel extends JPanel {
             } else if (name.equalsIgnoreCase("Ensemble de sport")) {
                 hasEnsemble = true;
                 brassiereEtEnsembleTotal += lineTotal;
-            } else if (!name.startsWith("Séance #")) {
-                // non lié à la promo, ajouté plus haut
             }
         }
 
         double discount = 0.0;
-
-        // Réduction sur séances (4 ou +)
         if (totalSessionQty >= 4) {
             double discountSession = totalSessionPrice * 0.2;
             discount += discountSession;
@@ -93,14 +95,12 @@ public class OrderSummaryPanel extends JPanel {
             total += totalSessionPrice;
         }
 
-        // Réduction brassière + ensemble
         if (hasBrassiere && hasEnsemble) {
             double discountBE = brassiereEtEnsembleTotal * 0.2;
             discount += discountBE;
             total -= discountBE;
         }
 
-        // Panneau bas
         JLabel discountLabel = new JLabel("Réduction appliquée : -" + String.format("%.2f €", discount), SwingConstants.CENTER);
         discountLabel.setFont(new Font("SansSerif", Font.ITALIC, 16));
         discountLabel.setForeground(new Color(0, 128, 0));
@@ -163,5 +163,21 @@ public class OrderSummaryPanel extends JPanel {
             case 1004 -> "photos/serviettes.png";
             default -> "photos/default.png";
         };
+    }
+
+    private ImageIcon getDogIcon(String breed) {
+        String path = switch (breed.toLowerCase()) {
+            case "golden retriever" -> "photos/golden.png";
+            case "labrador" -> "photos/labrador.png";
+            case "beagle" -> "photos/beagle.png";
+            case "bulldog" -> "photos/bulldog.png";
+            case "cocker spaniel" -> "photos/cocker.png";
+            case "poodle" -> "photos/poodle.png";
+            case "schnauzer" -> "photos/schnauzer.png";
+            default -> "photos/races/default.png";
+        };
+        ImageIcon icon = new ImageIcon(path);
+        Image scaled = icon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
+        return new ImageIcon(scaled);
     }
 }
