@@ -1,9 +1,10 @@
 package view;
 
+import dao.DiscountDAO;
+import dao.TicketDAO;
+import model.Discount;
 import model.Ticket;
 import model.User;
-import dao.TicketDAO;
-
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -27,86 +28,95 @@ public class OrderSummaryPanel extends JPanel {
         title.setBorder(new EmptyBorder(20, 0, 20, 0));
         add(title, BorderLayout.NORTH);
 
+        // Panel pour afficher les articles du panier
         JPanel contentPanel = new JPanel();
         contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
         contentPanel.setBackground(new Color(255, 250, 240));
 
-        double total = 0.0;
-        double totalSessionPrice = 0.0;
-        int totalSessionQty = 0;
-        boolean hasBrassiere = false, hasEnsemble = false;
-        double brassiereEtEnsembleTotal = 0.0;
-
+        double totalBefore = 0.0;
         for (Ticket t : cartItems) {
             JPanel itemPanel = new JPanel(new BorderLayout());
             itemPanel.setBackground(Color.WHITE);
-            itemPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            itemPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
             JLabel imageLabel = new JLabel();
             imageLabel.setPreferredSize(new Dimension(100, 100));
+            ImageIcon icon = new ImageIcon(getImagePath(t.getSessionId()));
+            Image scaled = icon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
+            imageLabel.setIcon(new ImageIcon(scaled));
 
             String name = getItemName(t.getSessionId());
             int qty = t.getQuantity();
-            double lineTotal = t.getPrice() * qty;
-
-            if (name.startsWith("Séance #") && t.getRace() != null) {
-                ImageIcon icon = getDogIcon(t.getRace());
-                if (icon != null) imageLabel.setIcon(icon);
-            } else {
-                ImageIcon icon = new ImageIcon(getImagePath(t.getSessionId()));
-                Image scaled = icon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
-                imageLabel.setIcon(new ImageIcon(scaled));
-            }
+            double price = t.getPrice();
+            double lineTotal = price * qty;
 
             itemPanel.add(imageLabel, BorderLayout.WEST);
-
             JLabel nameLabel = new JLabel(name + " - Qté : " + qty);
             nameLabel.setFont(new Font("SansSerif", Font.PLAIN, 16));
             itemPanel.add(nameLabel, BorderLayout.CENTER);
-
             JLabel priceLabel = new JLabel(String.format("%.2f €", lineTotal));
             priceLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
             itemPanel.add(priceLabel, BorderLayout.EAST);
 
             contentPanel.add(itemPanel);
+            totalBefore += lineTotal;
+        }
 
-            if (name.startsWith("Séance #")) {
-                totalSessionQty += qty;
-                totalSessionPrice += lineTotal;
-            } else {
-                total += lineTotal;
+        // Debug : afficher le total avant réduction
+        System.out.println("DEBUG >> Total avant réduction = " + totalBefore);
+
+        // Calcul des promotions actives
+        double promoDiscount = 0.0;
+        List<Discount> activePromos = DiscountDAO.getActiveDiscounts();
+        System.out.println("DEBUG >> Nombre de promos actives : " + activePromos.size());
+        for (Discount d : activePromos) {
+            // On retire d'éventuels espaces parasites
+            String promoType = d.getDiscountType().trim();
+            String promoCategory = d.getTargetCategory().trim();
+            System.out.println("DEBUG >> Promo ID=" + d.getId() + ", type=" + promoType +
+                    ", category=" + promoCategory + ", targetId=" + d.getTargetId() +
+                    ", minQ=" + d.getMinQuantity() + ", amount=" + d.getDiscountAmount() +
+                    ", start=" + d.getStartDate() + ", end=" + d.getEndDate());
+            // Pour chaque ticket du panier, tester si la promo s'applique
+            for (Ticket t : cartItems) {
+                int ticketSessionId = t.getSessionId();
+                int qty = t.getQuantity();
+                double price = t.getPrice();
+                // Pour vos produits, si l'ID >= 101, considérez-les comme "Produit"
+                String ticketCategory = (ticketSessionId >= 101) ? "Produit" : "Session";
+                System.out.println("DEBUG >> Ticket ID=" + t.getId() + " : sessionId=" + ticketSessionId +
+                        ", qty=" + qty + ", category=" + ticketCategory);
+                if (promoCategory.equalsIgnoreCase(ticketCategory) &&
+                        ticketSessionId == d.getTargetId() &&
+                        qty >= d.getMinQuantity()) {
+                    System.out.println("DEBUG >> Conditions OK pour promo ID " + d.getId());
+                    if ("pourcentage".equalsIgnoreCase(promoType)) {
+                        double lineDiscount = price * qty * (d.getDiscountAmount() / 100.0);
+                        System.out.println("DEBUG >> Appliquer " + lineDiscount + "€ (pourcentage)");
+                        promoDiscount += lineDiscount;
+                    } else if ("gratuit".equalsIgnoreCase(promoType)) {
+                        int groupSize = d.getMinQuantity() + (int) d.getDiscountAmount();
+                        int freeItems = (int) (qty / groupSize) * (int) d.getDiscountAmount();
+                        double lineDiscount = freeItems * price;
+                        System.out.println("DEBUG >> Appliquer " + lineDiscount + "€ (gratuit) via " + freeItems + " article(s) gratuit(s)");
+                        promoDiscount += lineDiscount;
+                    }
+                } else {
+                    System.out.println("DEBUG >> Conditions non vérifiées pour promo ID " + d.getId());
+                }
             }
-
-            if (name.equalsIgnoreCase("Brassières de sport")) {
-                hasBrassiere = true;
-                brassiereEtEnsembleTotal += lineTotal;
-            } else if (name.equalsIgnoreCase("Ensemble de sport")) {
-                hasEnsemble = true;
-                brassiereEtEnsembleTotal += lineTotal;
-            }
         }
 
-        double discount = 0.0;
-        if (totalSessionQty >= 4) {
-            double discountSession = totalSessionPrice * 0.2;
-            discount += discountSession;
-            total += totalSessionPrice - discountSession;
-        } else {
-            total += totalSessionPrice;
-        }
+        double totalAfter = totalBefore - promoDiscount;
+        System.out.println("DEBUG >> Total promotion = " + promoDiscount);
+        System.out.println("DEBUG >> Total après réduction = " + totalAfter);
 
-        if (hasBrassiere && hasEnsemble) {
-            double discountBE = brassiereEtEnsembleTotal * 0.2;
-            discount += discountBE;
-            total -= discountBE;
-        }
-
-        JLabel discountLabel = new JLabel("Réduction appliquée : -" + String.format("%.2f €", discount), SwingConstants.CENTER);
+        JLabel discountLabel = new JLabel(String.format("Réduction appliquée : -%.2f €", promoDiscount), SwingConstants.CENTER);
         discountLabel.setFont(new Font("SansSerif", Font.ITALIC, 16));
         discountLabel.setForeground(new Color(0, 128, 0));
         discountLabel.setBorder(new EmptyBorder(10, 0, 5, 0));
 
-        JLabel totalLabel = new JLabel("Total après réduction : " + String.format("%.2f €", total), SwingConstants.CENTER);
+        JLabel totalLabel = new JLabel(String.format("Total après réduction : %.2f €", totalAfter), SwingConstants.CENTER);
         totalLabel.setFont(new Font("Serif", Font.BOLD, 20));
         totalLabel.setBorder(new EmptyBorder(10, 0, 10, 0));
 
@@ -117,7 +127,9 @@ public class OrderSummaryPanel extends JPanel {
             boolean ok = TicketDAO.checkoutCart(currentUser.getId());
             if (ok) {
                 JOptionPane.showMessageDialog(this, "Achat validé avec succès !");
-                if (onCheckoutComplete != null) onCheckoutComplete.run();
+                if (onCheckoutComplete != null) {
+                    onCheckoutComplete.run();
+                }
                 SwingUtilities.getWindowAncestor(this).dispose();
             } else {
                 JOptionPane.showMessageDialog(this, "Erreur lors de la validation de l'achat.");
@@ -137,47 +149,31 @@ public class OrderSummaryPanel extends JPanel {
     }
 
     private String getItemName(int sessionId) {
-        if (sessionId <= 100) return "Séance #" + sessionId;
+        if (sessionId < 101) return "Séance #" + sessionId;
         return switch (sessionId) {
-            case 2001 -> "Brassières de sport";
-            case 2002 -> "Ensemble de sport";
-            case 2003 -> "Poids";
-            case 2004 -> "Tapis de yoga";
-            case 1001 -> "Chaussettes de yoga";
-            case 1002 -> "Barres de céréales";
-            case 1003 -> "Bouteilles énergisantes";
-            case 1004 -> "Serviettes";
+            case 101 -> "Chaussettes de yoga";
+            case 102 -> "Poids";
+            case 103 -> "Tapis de yoga";
+            case 104 -> "Barres de céréales";
+            case 105 -> "Bouteilles énergisantes";
+            case 106 -> "Brassières de sport";
+            case 107 -> "Ensemble de sport";
+            case 108 -> "Serviettes";
             default -> "Article #" + sessionId;
         };
     }
 
     private String getImagePath(int sessionId) {
         return switch (sessionId) {
-            case 2001 -> "photos/brassieres.png";
-            case 2002 -> "photos/ensemble.png";
-            case 2003 -> "photos/poids.png";
-            case 2004 -> "photos/tapis.png";
-            case 1001 -> "photos/chaussettes.png";
-            case 1002 -> "photos/barres.png";
-            case 1003 -> "photos/bouteilles.png";
-            case 1004 -> "photos/serviettes.png";
+            case 101 -> "photos/chaussettes.png";
+            case 102 -> "photos/poids.png";
+            case 103 -> "photos/tapis.png";
+            case 104 -> "photos/barres.png";
+            case 105 -> "photos/bouteilles.png";
+            case 106 -> "photos/brassieres.png";
+            case 107 -> "photos/ensemble.png";
+            case 108 -> "photos/serviettes.png";
             default -> "photos/default.png";
         };
-    }
-
-    private ImageIcon getDogIcon(String breed) {
-        String path = switch (breed.toLowerCase()) {
-            case "golden retriever" -> "photos/golden.png";
-            case "labrador" -> "photos/labrador.png";
-            case "beagle" -> "photos/beagle.png";
-            case "bulldog" -> "photos/bulldog.png";
-            case "cocker spaniel" -> "photos/cocker.png";
-            case "poodle" -> "photos/poodle.png";
-            case "schnauzer" -> "photos/schnauzer.png";
-            default -> "photos/races/default.png";
-        };
-        ImageIcon icon = new ImageIcon(path);
-        Image scaled = icon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
-        return new ImageIcon(scaled);
     }
 }

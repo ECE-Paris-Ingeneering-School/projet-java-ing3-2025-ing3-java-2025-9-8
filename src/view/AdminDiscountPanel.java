@@ -7,12 +7,15 @@ import javax.swing.*;
 import javax.swing.border.BevelBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
 
+/**
+ * AdminDiscountPanel : permet à l’admin de gérer les promos
+ * (n’affiche plus d’erreur "cannot find symbol method getConditions()").
+ */
 public class AdminDiscountPanel extends JPanel {
 
     private JTable table;
@@ -31,10 +34,22 @@ public class AdminDiscountPanel extends JPanel {
         add(titlePanel, BorderLayout.NORTH);
 
         // --- Tableau ---
-        // 5 colonnes : ID, Nom, Description, Conditions, Remise
-        String[] columns = {"ID", "Nom", "Description", "Conditions", "Remise"};
+        // Colonnes : ID, Nom, Description, Min Qté, Type, Montant, Catégorie, Cible, Début, Fin
+        String[] columns = {
+                "ID",
+                "Nom",
+                "Description",
+                "Min Qté",
+                "Type",
+                "Montant",
+                "Catégorie",
+                "Cible",
+                "Début",
+                "Fin"
+        };
         model = new DefaultTableModel(columns, 0) {
-            @Override public boolean isCellEditable(int row, int col) {
+            @Override
+            public boolean isCellEditable(int row, int col) {
                 return false;
             }
         };
@@ -56,11 +71,10 @@ public class AdminDiscountPanel extends JPanel {
         centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 
-        // JScrollPane
         JScrollPane scrollPane = new JScrollPane(table);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.getViewport().setBackground(new Color(255, 250, 240));
-        scrollPane.setPreferredSize(new Dimension(900, 350));
+        scrollPane.setPreferredSize(new Dimension(1100, 350));
 
         // Panel pour centrer horizontalement
         JPanel centerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 20));
@@ -96,7 +110,7 @@ public class AdminDiscountPanel extends JPanel {
 
         // Listeners
         addButton.addActionListener(e -> {
-            // Ouvre un DiscountForm sans ID => ajout
+            // Ouvre DiscountForm sans ID => ajout
             new DiscountForm(null, this).setVisible(true);
         });
         editButton.addActionListener(e -> {
@@ -132,25 +146,32 @@ public class AdminDiscountPanel extends JPanel {
     }
 
     /**
-     * Récupère les offres depuis la BDD via DiscountDAO.
+     * Récupère les offres dans la BDD via DiscountDAO
+     * et les affiche dans le tableau
      */
     public void loadDiscounts() {
         model.setRowCount(0);
         List<Discount> discounts = DiscountDAO.getAllDiscounts();
         for (Discount d : discounts) {
+            String cible = d.getTargetCategory() + " #" + d.getTargetId();
             model.addRow(new Object[]{
                     d.getId(),
                     d.getName(),
                     d.getDescription(),
-                    d.getConditions(),
-                    d.getValue()
+                    d.getMinQuantity(),
+                    d.getDiscountType(),
+                    d.getDiscountAmount(),
+                    d.getTargetCategory(),
+                    cible,
+                    d.getStartDate(),
+                    d.getEndDate()
             });
         }
     }
 
     private void setColumnWidths() {
-        // ID, Nom, Description, Conditions, Remise
-        int[] widths = {60, 150, 300, 200, 100};
+        // ID, Nom, Description, Min Qté, Type, Montant, Catégorie, Cible, Début, Fin
+        int[] widths = {40, 150, 250, 80, 90, 80, 100, 140, 110, 110};
         for (int i = 0; i < widths.length; i++) {
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
         }
