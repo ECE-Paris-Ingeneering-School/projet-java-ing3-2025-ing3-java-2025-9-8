@@ -25,13 +25,12 @@ public class TicketDAO {
     public static List<Ticket> getCartItems(int userId) {
         List<Ticket> items = new ArrayList<>();
         String sql = """
-            SELECT t.*, db.breed_name AS race
-            FROM Ticket t
-            JOIN Session s ON t.session_id = s.id
-            LEFT JOIN DogBreed db ON s.dog_breed_id = db.id
-            WHERE t.user_id = ?
-        """;
-
+        SELECT t.*, db.breed_name AS race
+        FROM Ticket t
+        LEFT JOIN Session s ON t.session_id = s.id
+        LEFT JOIN DogBreed db ON s.dog_breed_id = db.id
+        WHERE t.user_id = ?
+    """;
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -61,10 +60,9 @@ public class TicketDAO {
 
     public static List<Ticket> getLastPurchasedItems(int userId) {
         List<Ticket> items = new ArrayList<>();
-        String sql = "SELECT od.product_id AS session_id, od.price, od.quantity, oi.order_date FROM OrderDetails od " +
-                "JOIN OrderInfo oi ON od.order_id = oi.id " +
+        String sql = "SELECT od.product_id AS session_id, od.price, od.quantity, oi.order_date " +
+                "FROM OrderDetails od JOIN OrderInfo oi ON od.order_id = oi.id " +
                 "WHERE oi.user_id = ? ORDER BY oi.order_date DESC LIMIT 10";
-
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -80,7 +78,6 @@ public class TicketDAO {
                 Ticket t = new Ticket(0, sessionId, price, quantity, userId, addedDate);
                 items.add(t);
             }
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -162,10 +159,15 @@ public class TicketDAO {
             orderStmt = conn.prepareStatement("INSERT INTO OrderInfo (user_id, order_date, total) VALUES (?, NOW(), ?)", Statement.RETURN_GENERATED_KEYS);
             orderStmt.setInt(1, userId);
             orderStmt.setDouble(2, total);
-            if (orderStmt.executeUpdate() == 0) { conn.rollback(); return false; }
-
+            if (orderStmt.executeUpdate() == 0) {
+                conn.rollback();
+                return false;
+            }
             ResultSet rs = orderStmt.getGeneratedKeys();
-            if (!rs.next()) { conn.rollback(); return false; }
+            if (!rs.next()) {
+                conn.rollback();
+                return false;
+            }
             int orderId = rs.getInt(1);
 
             orderDetailsStmt = conn.prepareStatement("INSERT INTO OrderDetails (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)");
@@ -197,15 +199,31 @@ public class TicketDAO {
 
         } catch (Exception e) {
             if (conn != null) {
-                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+                try {
+                    conn.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
             }
             e.printStackTrace();
             return false;
         } finally {
-            try { if (orderStmt != null) orderStmt.close(); } catch (Exception ignored) {}
-            try { if (orderDetailsStmt != null) orderDetailsStmt.close(); } catch (Exception ignored) {}
-            try { if (reservationStmt != null) reservationStmt.close(); } catch (Exception ignored) {}
-            try { if (deleteStmt != null) deleteStmt.close(); } catch (Exception ignored) {}
+            try {
+                if (orderStmt != null) orderStmt.close();
+            } catch (Exception ignored) {
+            }
+            try {
+                if (orderDetailsStmt != null) orderDetailsStmt.close();
+            } catch (Exception ignored) {
+            }
+            try {
+                if (reservationStmt != null) reservationStmt.close();
+            } catch (Exception ignored) {
+            }
+            try {
+                if (deleteStmt != null) deleteStmt.close();
+            } catch (Exception ignored) {
+            }
             try {
                 if (conn != null && !conn.isClosed()) {
                     conn.setAutoCommit(true);
