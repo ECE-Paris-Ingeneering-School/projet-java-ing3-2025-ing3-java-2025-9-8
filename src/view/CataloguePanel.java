@@ -5,6 +5,10 @@ import model.User;
 import javax.swing.*;
 import java.awt.*;
 
+/**
+ * CataloguePanel affiche plusieurs produits en grille et permet
+ * à l'utilisateur d'ajouter un produit au panier en choisissant la quantité.
+ */
 public class CataloguePanel extends JPanel {
     private User currentUser;
 
@@ -13,7 +17,6 @@ public class CataloguePanel extends JPanel {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
-
         JLabel title = new JLabel("Catalogue", SwingConstants.CENTER);
         title.setFont(new Font("Serif", Font.BOLD, 32));
         add(title, BorderLayout.NORTH);
@@ -21,8 +24,8 @@ public class CataloguePanel extends JPanel {
         JPanel productsPanel = new JPanel(new GridLayout(0, 3, 20, 20));
         productsPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        // Pour chaque produit, on attribue un identifiant unique (par exemple, 2001 pour Brassières, 2002 pour Ensemble, etc.)
-        productsPanel.add(createProductCard("Chaussettes de yoga", 12.0, "photos/chaussettes.png", 1001));
+        // Pour chaque produit, assurez-vous d'utiliser l'ID correspondant dans votre base
+        productsPanel.add(createProductCard("Chaussettes de yoga", 12.0, "photos/chaussettes.png", 1));
         productsPanel.add(createProductCard("Poids", 15.0, "photos/poids.png", 2003));
         productsPanel.add(createProductCard("Tapis de yoga", 30.0, "photos/tapis.png", 2004));
         productsPanel.add(createProductCard("Barres de céréales", 5.0, "photos/barres.png", 1002));
@@ -34,20 +37,30 @@ public class CataloguePanel extends JPanel {
         add(productsPanel, BorderLayout.CENTER);
     }
 
-    // Méthode modifiée : on passe également l'ID du produit pour pouvoir l'insérer dans le panier
+    /**
+     * Crée une "carte" produit avec image, nom, prix et un bouton d'ajout au panier.
+     * Lors du clic, une boîte de dialogue apparaît pour sélectionner la quantité.
+     *
+     * @param productName Le nom du produit.
+     * @param price Le prix du produit.
+     * @param imagePath Chemin de l'image.
+     * @param productId L'ID du produit.
+     * @return Le JPanel correspondant à la carte produit.
+     */
     private JPanel createProductCard(String productName, double price, String imagePath, int productId) {
         JPanel card = new JPanel();
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
         card.setBackground(Color.WHITE);
 
+        // Image du produit
         JLabel picLabel = new JLabel();
         picLabel.setAlignmentX(CENTER_ALIGNMENT);
         ImageIcon icon = new ImageIcon(imagePath);
         Image scaled = icon.getImage().getScaledInstance(80, 80, Image.SCALE_SMOOTH);
-        icon = new ImageIcon(scaled);
-        picLabel.setIcon(icon);
+        picLabel.setIcon(new ImageIcon(scaled));
 
+        // Nom et prix
         JLabel nameLabel = new JLabel(productName, SwingConstants.CENTER);
         nameLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
         nameLabel.setAlignmentX(CENTER_ALIGNMENT);
@@ -57,16 +70,31 @@ public class CataloguePanel extends JPanel {
         priceLabel.setForeground(Color.GRAY);
         priceLabel.setAlignmentX(CENTER_ALIGNMENT);
 
+        // Bouton pour ajouter au panier
         JButton buyButton = new JButton("Ajouter au panier");
         buyButton.setFont(new Font("SansSerif", Font.PLAIN, 14));
         buyButton.setAlignmentX(CENTER_ALIGNMENT);
         buyButton.addActionListener(e -> {
-            // Appel effectif à l'insertion dans le panier
-            boolean inserted = TicketDAO.insertTicket(productId, price, 1, currentUser.getId());
-            if (inserted) {
-                JOptionPane.showMessageDialog(this, productName + " ajouté au panier !");
-            } else {
-                JOptionPane.showMessageDialog(this, "Erreur lors de l'ajout au panier.");
+            // Crée un JSpinner pour sélectionner la quantité
+            JSpinner spinner = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+            int option = JOptionPane.showOptionDialog(
+                    this,
+                    spinner,
+                    "Sélectionnez la quantité",
+                    JOptionPane.OK_CANCEL_OPTION,
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    null,
+                    null
+            );
+            if (option == JOptionPane.OK_OPTION) {
+                int quantity = (Integer) spinner.getValue();
+                boolean inserted = TicketDAO.insertTicket(productId, price, quantity, currentUser.getId());
+                if (inserted) {
+                    JOptionPane.showMessageDialog(this, productName + " ajouté au panier !");
+                } else {
+                    JOptionPane.showMessageDialog(this, "Erreur lors de l'ajout au panier.");
+                }
             }
         });
 
