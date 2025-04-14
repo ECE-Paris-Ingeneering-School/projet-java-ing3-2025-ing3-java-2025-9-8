@@ -1,7 +1,6 @@
 package view;
 
 import model.User;
-
 import javax.swing.*;
 import java.awt.*;
 
@@ -13,7 +12,6 @@ public class DeliveryInfoPanel extends JPanel {
 
     public DeliveryInfoPanel(User user, Runnable onNext) {
         this.currentUser = user;
-
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
@@ -30,8 +28,9 @@ public class DeliveryInfoPanel extends JPanel {
         gbc.gridx = 0;
         gbc.gridy = 0;
 
+        // Les champs sont initialisés à partir de l'objet User (getOrDefault pour éviter les nulls)
         nameField = new JTextField(getOrDefault(currentUser.getName()));
-        surnameField = new JTextField(); // à récupérer à part si découpé depuis getName
+        surnameField = new JTextField(); // Si vous stockez le prénom et le nom ensemble, gardez ce champ ou adaptez-le
         phoneField = new JTextField(getOrDefault(currentUser.getPhone()));
         streetField = new JTextField(getOrDefault(currentUser.getStreet()));
         complementField = new JTextField(getOrDefault(currentUser.getComplement()));
@@ -41,7 +40,6 @@ public class DeliveryInfoPanel extends JPanel {
                 "Île-de-France", "Provence-Alpes-Côte d'Azur",
                 "Auvergne-Rhône-Alpes", "Autre"
         });
-
         if (currentUser.getRegion() != null) {
             regionBox.setSelectedItem(currentUser.getRegion());
         }
@@ -50,7 +48,7 @@ public class DeliveryInfoPanel extends JPanel {
         addField(formPanel, gbc, "Nom *", surnameField);
         addField(formPanel, gbc, "Téléphone portable *", phoneField);
         addField(formPanel, gbc, "Voie *", streetField);
-        addField(formPanel, gbc, "Informations complémentaires", complementField);
+        addField(formPanel, gbc, "Complément", complementField);
         addField(formPanel, gbc, "Code postal *", postalCodeField);
         addField(formPanel, gbc, "Ville *", cityField);
 
@@ -63,26 +61,23 @@ public class DeliveryInfoPanel extends JPanel {
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 30, 20));
         buttonPanel.setBackground(Color.WHITE);
-
         JButton nextButton = new JButton("Continuer");
         nextButton.setFont(new Font("SansSerif", Font.BOLD, 14));
         nextButton.addActionListener(e -> {
             if (isFormValid()) {
-                // mise à jour des données dans l'objet User
-                currentUser.setName(nameField.getText().trim()); // ici tu peux aussi concaténer nom/prénom
+                // Mise à jour de l'objet User avec les données saisies
+                currentUser.setName(nameField.getText().trim());
                 currentUser.setPhone(phoneField.getText().trim());
                 currentUser.setStreet(streetField.getText().trim());
                 currentUser.setComplement(complementField.getText().trim());
                 currentUser.setPostalCode(postalCodeField.getText().trim());
                 currentUser.setCity(cityField.getText().trim());
                 currentUser.setRegion((String) regionBox.getSelectedItem());
-
                 onNext.run();
             } else {
                 JOptionPane.showMessageDialog(this, "Veuillez remplir tous les champs obligatoires.");
             }
         });
-
         buttonPanel.add(nextButton);
         add(buttonPanel, BorderLayout.SOUTH);
     }

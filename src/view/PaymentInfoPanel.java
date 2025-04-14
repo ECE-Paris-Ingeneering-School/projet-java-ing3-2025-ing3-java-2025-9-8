@@ -2,7 +2,6 @@ package view;
 
 import dao.UserDAO;
 import model.User;
-
 import javax.swing.*;
 import java.awt.*;
 
@@ -34,27 +33,32 @@ public class PaymentInfoPanel extends JPanel {
         yearField = new JTextField(getOrDefault(user.getCardYear()), 5);
         cvvField = new JTextField(getOrDefault(user.getCardCvv()), 5);
 
-        gbc.gridx = 0; gbc.gridy = 0;
+        gbc.gridx = 0;
+        gbc.gridy = 0;
         formPanel.add(new JLabel("Numéro de carte *"), gbc);
         gbc.gridx = 1;
         formPanel.add(cardNumberField, gbc);
 
-        gbc.gridx = 0; gbc.gridy = 1;
+        gbc.gridx = 0;
+        gbc.gridy = 1;
         formPanel.add(new JLabel("Titulaire de la carte *"), gbc);
         gbc.gridx = 1;
         formPanel.add(cardHolderField, gbc);
 
-        gbc.gridx = 0; gbc.gridy = 2;
+        gbc.gridx = 0;
+        gbc.gridy = 2;
         formPanel.add(new JLabel("Mois d'expiration *"), gbc);
         gbc.gridx = 1;
         formPanel.add(monthField, gbc);
 
-        gbc.gridx = 0; gbc.gridy = 3;
+        gbc.gridx = 0;
+        gbc.gridy = 3;
         formPanel.add(new JLabel("Année d'expiration *"), gbc);
         gbc.gridx = 1;
         formPanel.add(yearField, gbc);
 
-        gbc.gridx = 0; gbc.gridy = 4;
+        gbc.gridx = 0;
+        gbc.gridy = 4;
         formPanel.add(new JLabel("CVV *"), gbc);
         gbc.gridx = 1;
         formPanel.add(cvvField, gbc);
@@ -63,24 +67,28 @@ public class PaymentInfoPanel extends JPanel {
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 30, 20));
         buttonPanel.setBackground(Color.WHITE);
-
-        JButton nextButton = new JButton("Aller au résumé");
+        JButton nextButton = new JButton("Aller au récapitulatif");
         nextButton.setFont(new Font("SansSerif", Font.BOLD, 14));
         nextButton.addActionListener(e -> {
             if (validateFields()) {
-                user.setCardNumber(cardNumberField.getText());
-                user.setCardName(cardHolderField.getText());
-                user.setCardMonth(monthField.getText());
-                user.setCardYear(yearField.getText());
-                user.setCardCvv(cvvField.getText());
-
-                UserDAO.updateUserDeliveryAndPayment(user); // ⬅️ mise à jour BDD
+                // Mise à jour de l'objet User avec les infos saisies
+                user.setCardNumber(cardNumberField.getText().trim());
+                user.setCardName(cardHolderField.getText().trim());
+                user.setCardMonth(monthField.getText().trim());
+                user.setCardYear(yearField.getText().trim());
+                user.setCardCvv(cvvField.getText().trim());
+                // Mettez à jour la base de données, si nécessaire
+                UserDAO.updateUserDeliveryAndPayment(user);
                 onNext.run();
+                // Fermer la fenêtre parente du PaymentInfoPanel
+                Window window = SwingUtilities.getWindowAncestor(this);
+                if (window != null) {
+                    window.dispose();
+                }
             } else {
-                JOptionPane.showMessageDialog(this, "Veuillez remplir tous les champs.");
+                JOptionPane.showMessageDialog(this, "Veuillez remplir tous les champs obligatoires.");
             }
         });
-
         buttonPanel.add(nextButton);
         add(buttonPanel, BorderLayout.SOUTH);
     }

@@ -1,50 +1,54 @@
 package view;
 
-import model.Ticket;
 import model.User;
-
 import javax.swing.*;
 import java.awt.*;
-import java.util.List;
 
+/**
+ * CheckoutFrame orchestre le processus de paiement en deux étapes :
+ * 1. DeliveryInfoPanel : saisie/confirmation des informations personnelles et de livraison.
+ * 2. PaymentInfoPanel : saisie des informations bancaires.
+ * Une fois ces deux étapes complétées, CheckoutFrame se ferme et appelle le callback onFinish.
+ */
 public class CheckoutFrame extends JFrame {
     private CardLayout cardLayout;
     private JPanel cardPanel;
+    private User currentUser;
+    private Runnable onFinish; // Callback une fois les infos de livraison et paiement validées
 
-    public CheckoutFrame(User user, List<Ticket> cartItems, Runnable onCheckoutComplete, Runnable onUserUpdateCallback) {
+    public CheckoutFrame(User user, Runnable onFinish) {
         super("Validation de la commande");
+        this.currentUser = user;
+        this.onFinish = onFinish;
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setSize(800, 600);
         setLocationRelativeTo(null);
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
         cardLayout = new CardLayout();
         cardPanel = new JPanel(cardLayout);
 
-        // Étape 1 : Informations de livraison
-        DeliveryInfoPanel deliveryPanel = new DeliveryInfoPanel(user, () -> {
+        // Panneau 1 : informations personnelles et de livraison
+        DeliveryInfoPanel deliveryPanel = new DeliveryInfoPanel(currentUser, () -> {
+            // Une fois les infos de livraison validées, passage au panneau de paiement
             cardLayout.show(cardPanel, "PAYMENT");
         });
 
-        // Étape 2 : Informations bancaires
-        PaymentInfoPanel paymentPanel = new PaymentInfoPanel(user, () -> {
-            // ✅ Mise à jour de la BDD
-            dao.UserDAO.updateUserDeliveryAndPayment(user);
-
-            // ✅ Mise à jour du profil visuellement
-            if (onUserUpdateCallback != null) onUserUpdateCallback.run();
-
-            cardLayout.show(cardPanel, "SUMMARY");
-        });
-
-        // Étape 3 : Résumé de la commande
-        OrderSummaryPanel summaryPanel = new OrderSummaryPanel(user, cartItems, () -> {
-            if (onCheckoutComplete != null) onCheckoutComplete.run();
-            dispose(); // ferme la fenêtre
+        // Panneau 2 : informations bancaires
+        PaymentInfoPanel paymentPanel = new PaymentInfoPanel(currentUser, () -> {
+            // Après validation des infos de paiement, fermer CheckoutFrame et appeler onFinish
+            JOptionPane.showMessageDialog(this,
+                    "Vos informations de paiement ont été enregistrées.\nVous serez redirigé vers le récapitulatif de votre commande.");
+            Window window = SwingUtilities.getWindowAncestor(this);
+            if (window != null) {
+                window.dispose();
+            }
+            if (onFinish != null) {
+                onFinish.run();
+            }
         });
 
         cardPanel.add(deliveryPanel, "DELIVERY");
         cardPanel.add(paymentPanel, "PAYMENT");
-        cardPanel.add(summaryPanel, "SUMMARY");
 
         add(cardPanel);
         setVisible(true);

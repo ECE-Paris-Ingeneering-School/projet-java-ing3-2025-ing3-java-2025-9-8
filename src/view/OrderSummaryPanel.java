@@ -8,13 +8,21 @@ import model.User;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class OrderSummaryPanel extends JPanel {
     private User currentUser;
     private List<Ticket> cartItems;
     private Runnable onCheckoutComplete;
 
+    /**
+     * Construit un récapitulatif de commande affichant la liste des articles, le total et la réduction appliquée.
+     * @param user L'utilisateur courant.
+     * @param cartItems La liste des tickets du panier.
+     * @param onCheckoutComplete Callback appelé lorsque l'utilisateur confirme la commande.
+     */
     public OrderSummaryPanel(User user, List<Ticket> cartItems, Runnable onCheckoutComplete) {
         this.currentUser = user;
         this.cartItems = cartItems;
@@ -23,12 +31,12 @@ public class OrderSummaryPanel extends JPanel {
         setLayout(new BorderLayout());
         setBackground(new Color(255, 250, 240));
 
-        JLabel title = new JLabel("Résumé de votre commande", SwingConstants.CENTER);
+        JLabel title = new JLabel("Récapitulatif de votre commande", SwingConstants.CENTER);
         title.setFont(new Font("Serif", Font.BOLD, 24));
         title.setBorder(new EmptyBorder(20, 0, 20, 0));
         add(title, BorderLayout.NORTH);
 
-        // Panel pour afficher les articles du panier
+        // Panel pour afficher la liste des articles du panier
         JPanel contentPanel = new JPanel();
         contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
         contentPanel.setBackground(new Color(255, 250, 240));
@@ -62,54 +70,38 @@ public class OrderSummaryPanel extends JPanel {
             totalBefore += lineTotal;
         }
 
-        // Debug : afficher le total avant réduction
-        System.out.println("DEBUG >> Total avant réduction = " + totalBefore);
-
         // Calcul des promotions actives
         double promoDiscount = 0.0;
+        List<String> appliedPromos = new ArrayList<>();
         List<Discount> activePromos = DiscountDAO.getActiveDiscounts();
-        System.out.println("DEBUG >> Nombre de promos actives : " + activePromos.size());
         for (Discount d : activePromos) {
-            // On retire d'éventuels espaces parasites
             String promoType = d.getDiscountType().trim();
-            String promoCategory = d.getTargetCategory().trim();
-            System.out.println("DEBUG >> Promo ID=" + d.getId() + ", type=" + promoType +
-                    ", category=" + promoCategory + ", targetId=" + d.getTargetId() +
-                    ", minQ=" + d.getMinQuantity() + ", amount=" + d.getDiscountAmount() +
-                    ", start=" + d.getStartDate() + ", end=" + d.getEndDate());
-            // Pour chaque ticket du panier, tester si la promo s'applique
             for (Ticket t : cartItems) {
                 int ticketSessionId = t.getSessionId();
                 int qty = t.getQuantity();
                 double price = t.getPrice();
-                // Pour vos produits, si l'ID >= 101, considérez-les comme "Produit"
                 String ticketCategory = (ticketSessionId >= 101) ? "Produit" : "Session";
-                System.out.println("DEBUG >> Ticket ID=" + t.getId() + " : sessionId=" + ticketSessionId +
-                        ", qty=" + qty + ", category=" + ticketCategory);
-                if (promoCategory.equalsIgnoreCase(ticketCategory) &&
-                        ticketSessionId == d.getTargetId() &&
-                        qty >= d.getMinQuantity()) {
-                    System.out.println("DEBUG >> Conditions OK pour promo ID " + d.getId());
+                if (d.getTargetCategory().trim().equalsIgnoreCase(ticketCategory)
+                        && ticketSessionId == d.getTargetId()
+                        && qty >= d.getMinQuantity()) {
                     if ("pourcentage".equalsIgnoreCase(promoType)) {
                         double lineDiscount = price * qty * (d.getDiscountAmount() / 100.0);
-                        System.out.println("DEBUG >> Appliquer " + lineDiscount + "€ (pourcentage)");
                         promoDiscount += lineDiscount;
+                        if (!appliedPromos.contains(d.getName()))
+                            appliedPromos.add(d.getName() + " (-" + d.getDiscountAmount() + "%)");
                     } else if ("gratuit".equalsIgnoreCase(promoType)) {
                         int groupSize = d.getMinQuantity() + (int) d.getDiscountAmount();
                         int freeItems = (int) (qty / groupSize) * (int) d.getDiscountAmount();
                         double lineDiscount = freeItems * price;
-                        System.out.println("DEBUG >> Appliquer " + lineDiscount + "€ (gratuit) via " + freeItems + " article(s) gratuit(s)");
                         promoDiscount += lineDiscount;
+                        if (!appliedPromos.contains(d.getName()))
+                            appliedPromos.add(d.getName() + " (" + freeItems + " gratuit(s))");
                     }
-                } else {
-                    System.out.println("DEBUG >> Conditions non vérifiées pour promo ID " + d.getId());
                 }
             }
         }
 
         double totalAfter = totalBefore - promoDiscount;
-        System.out.println("DEBUG >> Total promotion = " + promoDiscount);
-        System.out.println("DEBUG >> Total après réduction = " + totalAfter);
 
         JLabel discountLabel = new JLabel(String.format("Réduction appliquée : -%.2f €", promoDiscount), SwingConstants.CENTER);
         discountLabel.setFont(new Font("SansSerif", Font.ITALIC, 16));
@@ -120,19 +112,22 @@ public class OrderSummaryPanel extends JPanel {
         totalLabel.setFont(new Font("Serif", Font.BOLD, 20));
         totalLabel.setBorder(new EmptyBorder(10, 0, 10, 0));
 
-        JButton confirmButton = new JButton("Valider l'achat");
+        String promoDetailString = appliedPromos.isEmpty() ? "Aucune promotion appliquée"
+                : appliedPromos.stream().collect(Collectors.joining(", "));
+        JLabel promoDetailsLabel = new JLabel("Promotions appliquées : " + promoDetailString, SwingConstants.CENTER);
+        promoDetailsLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        promoDetailsLabel.setBorder(new EmptyBorder(5, 0, 5, 0));
+
+        JButton confirmButton = new JButton("Confirmer et finaliser l'achat");
         confirmButton.setFont(new Font("SansSerif", Font.BOLD, 16));
         confirmButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         confirmButton.addActionListener(e -> {
-            boolean ok = TicketDAO.checkoutCart(currentUser.getId());
-            if (ok) {
-                JOptionPane.showMessageDialog(this, "Achat validé avec succès !");
-                if (onCheckoutComplete != null) {
-                    onCheckoutComplete.run();
-                }
-                SwingUtilities.getWindowAncestor(this).dispose();
-            } else {
-                JOptionPane.showMessageDialog(this, "Erreur lors de la validation de l'achat.");
+            if (onCheckoutComplete != null) {
+                onCheckoutComplete.run();
+            }
+            Window window = SwingUtilities.getWindowAncestor(this);
+            if (window != null) {
+                window.dispose();
             }
         });
 
@@ -140,6 +135,7 @@ public class OrderSummaryPanel extends JPanel {
         bottomPanel.setBackground(new Color(255, 250, 240));
         bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.Y_AXIS));
         bottomPanel.add(discountLabel);
+        bottomPanel.add(promoDetailsLabel);
         bottomPanel.add(totalLabel);
         bottomPanel.add(Box.createVerticalStrut(10));
         bottomPanel.add(confirmButton);

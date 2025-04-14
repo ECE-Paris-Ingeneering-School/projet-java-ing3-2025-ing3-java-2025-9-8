@@ -6,6 +6,7 @@ import model.Discount;
 import model.Ticket;
 import model.User;
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.ArrayList;
@@ -18,13 +19,11 @@ public class CartFrame extends JFrame {
     private DefaultTableModel model;
     private JLabel discountLabel;
     private JLabel totalLabel;
-    // Nouveau label pour détailler les promotions appliquées
     private JLabel promoDetailsLabel;
 
     public CartFrame(User user) {
         super("Mon Panier");
         this.currentUser = user;
-
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setSize(750, 550);
         setLocationRelativeTo(null);
@@ -38,7 +37,7 @@ public class CartFrame extends JFrame {
         headerPanel.add(headerLabel);
         add(headerPanel, BorderLayout.NORTH);
 
-        // Table
+        // Table de panier
         String[] colNames = {"ID", "sessionId", "Nom", "Prix unitaire", "Qté", "Sous-total", "Date ajout"};
         model = new DefaultTableModel(colNames, 0) {
             @Override
@@ -53,17 +52,16 @@ public class CartFrame extends JFrame {
         JScrollPane tableScroll = new JScrollPane(table);
         add(tableScroll, BorderLayout.CENTER);
 
-        // Footer : affiche réduction, détail des promos et total
+        // Footer : affichage de la réduction, du détail des promos et du total
         JPanel footerPanel = new JPanel();
         footerPanel.setLayout(new BoxLayout(footerPanel, BoxLayout.Y_AXIS));
         footerPanel.setBackground(new Color(242, 224, 200));
-        footerPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        footerPanel.setBorder(new EmptyBorder(10, 20, 10, 20));
 
         discountLabel = new JLabel("Réduction appliquée : -0,00 €", SwingConstants.CENTER);
         discountLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         discountLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // Nouveau label pour afficher le détail des promos
         promoDetailsLabel = new JLabel("Promotions appliquées : ", SwingConstants.CENTER);
         promoDetailsLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         promoDetailsLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -74,7 +72,6 @@ public class CartFrame extends JFrame {
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
         buttonPanel.setBackground(new Color(242, 224, 200));
-
         JButton removeButton = new JButton("Retirer l'article");
         removeButton.setFont(new Font("SansSerif", Font.BOLD, 14));
         removeButton.addActionListener(e -> removeSelectedItem());
@@ -92,10 +89,8 @@ public class CartFrame extends JFrame {
         footerPanel.add(totalLabel);
         footerPanel.add(Box.createVerticalStrut(10));
         footerPanel.add(buttonPanel);
-
         add(footerPanel, BorderLayout.SOUTH);
 
-        // Charger le contenu du panier et calculer promos et total
         loadCartItems();
     }
 
@@ -107,7 +102,6 @@ public class CartFrame extends JFrame {
             double price = t.getPrice();
             int qty = t.getQuantity();
             double subTotal = price * qty;
-
             model.addRow(new Object[]{
                     t.getId(),
                     sessionId,
@@ -124,10 +118,8 @@ public class CartFrame extends JFrame {
     private void recalcTotal() {
         double totalBefore = 0.0;
         for (int i = 0; i < model.getRowCount(); i++) {
-            double lineTotal = (double) model.getValueAt(i, 5);
-            totalBefore += lineTotal;
+            totalBefore += (double) model.getValueAt(i, 5);
         }
-        // Calcul des promos
         double promoDiscount = 0.0;
         List<String> appliedPromos = new ArrayList<>();
         List<Discount> activePromos = DiscountDAO.getActiveDiscounts();
@@ -137,9 +129,9 @@ public class CartFrame extends JFrame {
                 int ticketSessionId = t.getSessionId();
                 int qty = t.getQuantity();
                 double price = t.getPrice();
-                // Déterminer la catégorie : produit si ID >= 101, session sinon
+                // Pour vos produits, si l'ID >= 101, le ticket est de type "Produit"
                 String ticketCategory = (ticketSessionId >= 101) ? "Produit" : "Session";
-                if (d.getTargetCategory().equalsIgnoreCase(ticketCategory)
+                if (d.getTargetCategory().trim().equalsIgnoreCase(ticketCategory)
                         && ticketSessionId == d.getTargetId()
                         && qty >= d.getMinQuantity()) {
                     if ("pourcentage".equalsIgnoreCase(promoType)) {
@@ -161,7 +153,8 @@ public class CartFrame extends JFrame {
         double totalAfter = totalBefore - promoDiscount;
         discountLabel.setText(String.format("Réduction appliquée : -%.2f €", promoDiscount));
         totalLabel.setText(String.format("Total : %.2f €", totalAfter));
-        String promoDetailString = appliedPromos.isEmpty() ? "Aucune promotion appliquée" : appliedPromos.stream().collect(Collectors.joining(", "));
+        String promoDetailString = appliedPromos.isEmpty() ? "Aucune promotion appliquée"
+                : appliedPromos.stream().collect(Collectors.joining(", "));
         promoDetailsLabel.setText("Promotions appliquées : " + promoDetailString);
     }
 
@@ -169,8 +162,7 @@ public class CartFrame extends JFrame {
         int selectedRow = table.getSelectedRow();
         if (selectedRow >= 0) {
             int ticketId = (int) model.getValueAt(selectedRow, 0);
-            boolean ok = TicketDAO.removeItemFromCart(ticketId);
-            if (ok) {
+            if (TicketDAO.removeItemFromCart(ticketId)) {
                 JOptionPane.showMessageDialog(this, "Article retiré du panier.");
                 loadCartItems();
             } else {
@@ -181,19 +173,41 @@ public class CartFrame extends JFrame {
         }
     }
 
+    // Nouveau flux de validation : Lorsqu'on clique sur "Valider l'achat"
+    // On ferme le panier et on ouvre le CheckoutFrame.
     private void validatePurchase() {
         List<Ticket> items = TicketDAO.getCartItems(currentUser.getId());
         if (items.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Votre panier est vide.");
             return;
         }
-        boolean ok = TicketDAO.checkoutCart(currentUser.getId());
-        if (ok) {
-            JOptionPane.showMessageDialog(this, "Achat validé !");
-            dispose();
-        } else {
-            JOptionPane.showMessageDialog(this, "Erreur lors de la validation de l'achat.");
-        }
+        // Fermer le CartFrame et lancer CheckoutFrame
+        this.dispose();
+        new CheckoutFrame(currentUser, () -> {
+            // Une fois le CheckoutFrame terminé (infos personnelles et bancaires), on ouvre le récapitulatif
+            openOrderSummary();
+        }).setVisible(true);
+    }
+
+    // Ouvre une nouvelle fenêtre contenant le récapitulatif de commande (OrderSummaryPanel)
+    private void openOrderSummary() {
+        List<Ticket> items = TicketDAO.getCartItems(currentUser.getId());
+        JFrame summaryFrame = new JFrame("Récapitulatif de commande");
+        summaryFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        summaryFrame.setSize(800, 600);
+        summaryFrame.setLocationRelativeTo(null);
+
+        OrderSummaryPanel summaryPanel = new OrderSummaryPanel(currentUser, items, () -> {
+            // Callback après confirmation du récapitulatif : finalisation de la commande
+            boolean ok = TicketDAO.checkoutCart(currentUser.getId());
+            if (ok) {
+                JOptionPane.showMessageDialog(null, "Achat validé !");
+            } else {
+                JOptionPane.showMessageDialog(null, "Erreur lors de la validation de l'achat.");
+            }
+        });
+        summaryFrame.add(summaryPanel);
+        summaryFrame.setVisible(true);
     }
 
     private String getItemName(int sessionId) {
