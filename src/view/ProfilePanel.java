@@ -1,10 +1,9 @@
 package view;
 
 import dao.ProfileDAO;
-import model.User;
-import model.SessionReservation;
 import model.OrderInfoSimple;
-
+import model.SessionReservation;
+import model.User;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -16,6 +15,9 @@ public class ProfilePanel extends JPanel {
     private JPanel contentPanel;
     private JPanel infosPanel;
     private JPanel paiementPanel;
+    // Tables pour "Mes achats" et "Mes factures"
+    private JTable ordersTable;
+    private JTable reservationsTable;
 
     public ProfilePanel(User user) {
         this.currentUser = user;
@@ -27,24 +29,27 @@ public class ProfilePanel extends JPanel {
         title.setBorder(BorderFactory.createEmptyBorder(20, 0, 10, 0));
         add(title, BorderLayout.NORTH);
 
+        // Menu avec boutons
         JPanel menuPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 40, 10));
         menuPanel.setBackground(Color.WHITE);
 
         JButton achatsBtn = new JButton("Mes achats");
         JButton infosBtn = new JButton("Données personnelles");
         JButton paiementBtn = new JButton("Moyens de paiement");
-        JButton logoutBtn = new JButton("Se déconnecter"); // 👈 Bouton déconnexion
+        JButton refreshBtn = new JButton("Actualiser");
+        JButton logoutBtn = new JButton("Se déconnecter");
 
         achatsBtn.setFocusPainted(false);
         infosBtn.setFocusPainted(false);
         paiementBtn.setFocusPainted(false);
+        refreshBtn.setFocusPainted(false);
         logoutBtn.setFocusPainted(false);
 
         menuPanel.add(achatsBtn);
         menuPanel.add(infosBtn);
         menuPanel.add(paiementBtn);
-        menuPanel.add(logoutBtn); // 👈 Ajouté ici
-
+        menuPanel.add(refreshBtn);
+        menuPanel.add(logoutBtn);
         add(menuPanel, BorderLayout.CENTER);
 
         contentPanel = new JPanel();
@@ -67,12 +72,11 @@ public class ProfilePanel extends JPanel {
             refreshPaiementPanel();
             cardLayout.show(contentPanel, "PAIEMENT");
         });
-
-        // 👇 Action sur le bouton Se déconnecter
+        refreshBtn.addActionListener(e -> refreshPanels());
         logoutBtn.addActionListener(e -> {
             JFrame topFrame = (JFrame) SwingUtilities.getWindowAncestor(this);
-            topFrame.dispose(); // Ferme la fenêtre principale
-            new WelcomeFrame(); // Ouvre la page de connexion
+            topFrame.dispose();
+            new WelcomeFrame();
         });
 
         cardLayout.show(contentPanel, "ACHATS");
@@ -81,7 +85,9 @@ public class ProfilePanel extends JPanel {
     private JPanel createAchatsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         JTabbedPane tabs = new JTabbedPane();
+        // Onglet réservations (Mes achats)
         tabs.addTab("Mes réservations", createReservationsPanel());
+        // Onglet commandes (Mes factures)
         tabs.addTab("Mes factures", createOrdersPanel());
         panel.add(tabs, BorderLayout.CENTER);
         return panel;
@@ -90,13 +96,11 @@ public class ProfilePanel extends JPanel {
     private JPanel createReservationsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         List<SessionReservation> reservations = ProfileDAO.getUserReservations(currentUser.getId());
-
         String[] colNames = {"ID Réservation", "Date réservation", "Session date", "Session time", "Niveau", "Lieu"};
         DefaultTableModel model = new DefaultTableModel(colNames, 0) {
             public boolean isCellEditable(int row, int col) { return false; }
         };
-        JTable table = new JTable(model);
-
+        reservationsTable = new JTable(model);
         for (SessionReservation r : reservations) {
             model.addRow(new Object[]{
                     r.getReservationId(),
@@ -107,20 +111,18 @@ public class ProfilePanel extends JPanel {
                     r.getLocationName()
             });
         }
-        panel.add(new JScrollPane(table), BorderLayout.CENTER);
+        panel.add(new JScrollPane(reservationsTable), BorderLayout.CENTER);
         return panel;
     }
 
     private JPanel createOrdersPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         List<OrderInfoSimple> orders = ProfileDAO.getUserOrders(currentUser.getId());
-
         String[] colNames = {"ID Commande", "Date commande", "Total (€)"};
         DefaultTableModel model = new DefaultTableModel(colNames, 0) {
             public boolean isCellEditable(int row, int col) { return false; }
         };
-        JTable table = new JTable(model);
-
+        ordersTable = new JTable(model);
         for (OrderInfoSimple o : orders) {
             model.addRow(new Object[]{
                     o.getOrderId(),
@@ -128,7 +130,7 @@ public class ProfilePanel extends JPanel {
                     o.getTotal()
             });
         }
-        panel.add(new JScrollPane(table), BorderLayout.CENTER);
+        panel.add(new JScrollPane(ordersTable), BorderLayout.CENTER);
         return panel;
     }
 
@@ -180,7 +182,6 @@ public class ProfilePanel extends JPanel {
             String masked = (cardNumber != null && cardNumber.length() >= 4)
                     ? "**** **** **** " + cardNumber.substring(cardNumber.length() - 4)
                     : "Non renseigné";
-
             paiementPanel.add(new JLabel("Carte enregistrée : " + masked));
             paiementPanel.add(Box.createVerticalStrut(10));
             paiementPanel.add(new JLabel("Expiration : " + currentUser.getCardMonth() + "/" + currentUser.getCardYear()));

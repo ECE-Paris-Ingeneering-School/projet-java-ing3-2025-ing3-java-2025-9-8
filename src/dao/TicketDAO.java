@@ -1,5 +1,6 @@
 package dao;
 
+import model.Product;
 import model.Ticket;
 import java.sql.*;
 import java.util.ArrayList;
@@ -30,13 +31,11 @@ public class TicketDAO {
         LEFT JOIN Session s ON t.session_id = s.id
         LEFT JOIN DogBreed db ON s.dog_breed_id = db.id
         WHERE t.user_id = ?
-    """;
+        """;
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-
             stmt.setInt(1, userId);
             ResultSet rs = stmt.executeQuery();
-
             while (rs.next()) {
                 int id = rs.getInt("id");
                 int sessionId = rs.getInt("session_id");
@@ -50,11 +49,9 @@ public class TicketDAO {
                 t.setRace(race);
                 items.add(t);
             }
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
-
         return items;
     }
 
@@ -65,23 +62,19 @@ public class TicketDAO {
                 "WHERE oi.user_id = ? ORDER BY oi.order_date DESC LIMIT 10";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-
             stmt.setInt(1, userId);
             ResultSet rs = stmt.executeQuery();
-
             while (rs.next()) {
                 int sessionId = rs.getInt("session_id");
                 double price = rs.getDouble("price");
                 int quantity = rs.getInt("quantity");
                 Timestamp addedDate = rs.getTimestamp("order_date");
-
                 Ticket t = new Ticket(0, sessionId, price, quantity, userId, addedDate);
                 items.add(t);
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-
         return items;
     }
 
@@ -101,6 +94,7 @@ public class TicketDAO {
         }
     }
 
+    // Modification de checkoutCart pour mettre à jour le stock des produits achetés
     public static boolean checkoutCart(int userId) {
         Connection conn = null;
         PreparedStatement orderStmt = null;
@@ -118,33 +112,36 @@ public class TicketDAO {
             int totalSessionQty = 0;
             double totalSessionPrice = 0.0;
             boolean hasBrassiere = false, hasEnsemble = false;
+            // Liste pour les tickets correspondant à des produits (ID ≥ 101)
+            List<Ticket> productTickets = new ArrayList<>();
 
             for (Ticket t : tickets) {
                 String name;
                 int sid = t.getSessionId();
-                if (sid <= 100) name = "Séance #" + sid;
-                else if (sid == 2001) name = "Brassières de sport";
-                else if (sid == 2002) name = "Ensemble de sport";
-                else if (sid == 2003) name = "Poids";
-                else if (sid == 2004) name = "Tapis de yoga";
-                else name = "Article #" + sid;
-
-                double lineTotal = t.getPrice() * t.getQuantity();
-
-                if (name.startsWith("Séance #")) {
+                if (sid <= 100) {
+                    name = "Séance #" + sid;
                     totalSessionQty += t.getQuantity();
-                    totalSessionPrice += lineTotal;
+                    totalSessionPrice += t.getPrice() * t.getQuantity();
                 } else {
-                    total += lineTotal;
+                    // On considère tous les produits dont l'ID >= 101 comme des produits
+                    name = "Produit #" + sid;
+                    productTickets.add(t);
+                    total += t.getPrice() * t.getQuantity();
                 }
 
-                if (name.equalsIgnoreCase("Brassières de sport")) hasBrassiere = true;
-                if (name.equalsIgnoreCase("Ensemble de sport")) hasEnsemble = true;
+                if (name.equalsIgnoreCase("Brassières de sport")) {
+                    hasBrassiere = true;
+                }
+                if (name.equalsIgnoreCase("Ensemble de sport")) {
+                    hasEnsemble = true;
+                }
             }
 
-            if (totalSessionQty >= 4) totalSessionPrice *= 0.8;
+            // Application d'une éventuelle remise sur les séances
+            if (totalSessionQty >= 4) {
+                totalSessionPrice *= 0.8;
+            }
             total += totalSessionPrice;
-
             if (hasBrassiere && hasEnsemble) {
                 double sumBE = 0.0;
                 for (Ticket t : tickets) {
@@ -156,6 +153,7 @@ public class TicketDAO {
                 total -= sumBE * 0.2;
             }
 
+            // Insertion de la commande dans OrderInfo
             orderStmt = conn.prepareStatement("INSERT INTO OrderInfo (user_id, order_date, total) VALUES (?, NOW(), ?)", Statement.RETURN_GENERATED_KEYS);
             orderStmt.setInt(1, userId);
             orderStmt.setDouble(2, total);
@@ -170,6 +168,7 @@ public class TicketDAO {
             }
             int orderId = rs.getInt(1);
 
+            // Insertion des détails de commande
             orderDetailsStmt = conn.prepareStatement("INSERT INTO OrderDetails (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)");
             for (Ticket t : tickets) {
                 orderDetailsStmt.setInt(1, orderId);
@@ -180,6 +179,7 @@ public class TicketDAO {
             }
             orderDetailsStmt.executeBatch();
 
+            // Pour les séances (tickets dont l'ID < 101), insérer dans Reservation
             reservationStmt = conn.prepareStatement("INSERT INTO Reservation (user_id, session_id, reservation_date) VALUES (?, ?, NOW())");
             for (Ticket t : tickets) {
                 if (t.getSessionId() <= 100) {
@@ -190,48 +190,52 @@ public class TicketDAO {
             }
             reservationStmt.executeBatch();
 
+            // Mettre à jour le stock des produits achetés (tickets dont l'ID >= 101)
+            for (Ticket t : productTickets) {
+                int productId = t.getSessionId();
+                int qtyPurchased = t.getQuantity();
+                Product product = ProductDAO.getProductById(productId);
+                if (product != null) {
+                    int currentStock = product.getStock();
+                    int newStock = currentStock - qtyPurchased;
+                    if (newStock < 0) {
+                        conn.rollback();  // stock insuffisant
+                        return false;
+                    }
+                    boolean stockUpdated = ProductDAO.updateProductStock(productId, newStock);
+                    if (!stockUpdated) {
+                        conn.rollback();
+                        return false;
+                    }
+                }
+            }
+
+            // Vider le panier
             deleteStmt = conn.prepareStatement("DELETE FROM Ticket WHERE user_id = ?");
             deleteStmt.setInt(1, userId);
             deleteStmt.executeUpdate();
 
             conn.commit();
             return true;
-
         } catch (Exception e) {
             if (conn != null) {
                 try {
                     conn.rollback();
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
-                }
+                } catch (SQLException ex) { ex.printStackTrace(); }
             }
             e.printStackTrace();
             return false;
         } finally {
-            try {
-                if (orderStmt != null) orderStmt.close();
-            } catch (Exception ignored) {
-            }
-            try {
-                if (orderDetailsStmt != null) orderDetailsStmt.close();
-            } catch (Exception ignored) {
-            }
-            try {
-                if (reservationStmt != null) reservationStmt.close();
-            } catch (Exception ignored) {
-            }
-            try {
-                if (deleteStmt != null) deleteStmt.close();
-            } catch (Exception ignored) {
-            }
+            try { if (orderStmt != null) orderStmt.close(); } catch(Exception ignored) {}
+            try { if (orderDetailsStmt != null) orderDetailsStmt.close(); } catch(Exception ignored) {}
+            try { if (reservationStmt != null) reservationStmt.close(); } catch(Exception ignored) {}
+            try { if (deleteStmt != null) deleteStmt.close(); } catch(Exception ignored) {}
             try {
                 if (conn != null && !conn.isClosed()) {
                     conn.setAutoCommit(true);
                     conn.close();
                 }
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
+            } catch(SQLException e) { e.printStackTrace(); }
         }
     }
 }

@@ -19,7 +19,6 @@ public class ProductDAO {
                 double price = rs.getDouble("price");
                 String imagePath = rs.getString("image_path");
                 int stock = rs.getInt("stock");
-
                 Product p = new Product(id, name, price, imagePath, stock);
                 products.add(p);
             }
@@ -91,6 +90,21 @@ public class ProductDAO {
             int affected = stmt.executeUpdate();
             return affected > 0;
         } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // Méthode pour mettre à jour le stock d'un produit après un achat.
+    public static boolean updateProductStock(int productId, int newStock) {
+        String sql = "UPDATE Product SET stock = ? WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, newStock);
+            stmt.setInt(2, productId);
+            int affected = stmt.executeUpdate();
+            return affected > 0;
+        } catch(SQLException e) {
             e.printStackTrace();
             return false;
         }
